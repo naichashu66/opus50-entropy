@@ -1,0 +1,30 @@
+<!doctype html><meta charset="utf-8"><body><script>
+// 声谱图检查：读取 out/audio.wav → out/shots/spectro.jpg（对数频率 + 响度包络 + 时间刻度）
+(async () => {
+  const log = m => fetch('/__log?m=' + encodeURIComponent(m));
+  try {
+    const ab = await (await fetch('../out/audio.wav')).arrayBuffer(), v = new DataView(ab), SR = v.getUint32(24, true), n = (ab.byteLength - 44) / 4;
+    const x = new Float32Array(n); for (let i = 0; i < n; i++) x[i] = (v.getInt16(44 + i * 4, true) + v.getInt16(46 + i * 4, true)) / 65536;
+    const F = 4096, hop = Math.round(SR / 20), cols = Math.floor((n - F) / hop), rows = 520, top = 140, W = cols, H = rows + top + 40;
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const c = cv.getContext('2d'); c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+    const win = new Float32Array(F).map((_, i) => .5 - .5 * Math.cos(2 * Math.PI * i / F));
+    const re = new Float32Array(F), im = new Float32Array(F), rev = new Uint32Array(F); for (let i = 0; i < F; i++) { let r = 0, k = i; for (let b = 1; b < F; b <<= 1) { r = (r << 1) | (k & 1); k >>= 1; } rev[i] = r; }
+    const fft = () => { for (let i = 0; i < F; i++) if (rev[i] > i) { [re[i], re[rev[i]]] = [re[rev[i]], re[i]]; [im[i], im[rev[i]]] = [im[rev[i]], im[i]]; }
+      for (let s = 2; s <= F; s <<= 1) { const a = -2 * Math.PI / s; for (let i = 0; i < F; i += s) for (let j = 0; j < s / 2; j++) { const wr = Math.cos(a * j), wi = Math.sin(a * j), k = i + j, l = k + s / 2, tr = re[l] * wr - im[l] * wi, ti = re[l] * wi + im[l] * wr; re[l] = re[k] - tr; im[l] = im[k] - ti; re[k] += tr; im[k] += ti; } } };
+    const img = c.createImageData(W, rows); const f0 = 25, f1 = 18000;
+    for (let col = 0; col < cols; col++) {
+      const o = col * hop; for (let i = 0; i < F; i++) { re[i] = x[o + i] * win[i]; im[i] = 0; } fft();
+      let rms = 0; for (let i = 0; i < F; i += 4) rms += x[o + i] * x[o + i]; rms = Math.sqrt(rms / (F / 4)); const dbv = 20 * Math.log10(rms + 1e-9);
+      c.fillStyle = '#4af'; const h = Math.max(0, (dbv + 70) / 70) * (top - 20); c.fillRect(col, top - h, 1, h);
+      for (let r = 0; r < rows; r++) { const f = f0 * Math.pow(f1 / f0, 1 - r / rows), b = Math.round(f * F / SR); const m = Math.hypot(re[b], im[b]); const d = 20 * Math.log10(m + 1e-9); const k = Math.max(0, Math.min(1, (d + 40) / 70)); const p = (r * W + col) * 4;
+        img.data[p] = 255 * Math.min(1, k * 1.8); img.data[p + 1] = 255 * Math.max(0, k * 1.6 - .6); img.data[p + 2] = 255 * Math.max(0, .4 - k) * 2.2 + 255 * Math.max(0, k * 2 - 1.6); img.data[p + 3] = 255; }
+    }
+    c.putImageData(img, 0, top);
+    c.fillStyle = '#fff'; c.font = '14px Consolas';
+    for (let t = 0; t < n / SR; t += 10) { const xx = t * 20; c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(xx, 0, 1, H); c.fillStyle = '#fff'; c.fillText(t + 's', xx + 3, H - 12); }
+    [100, 1000, 10000].forEach(f => { const y = top + rows * (1 - Math.log(f / f0) / Math.log(f1 / f0)); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(0, y, W, 1); c.fillStyle = '#fff'; c.fillText(f + 'Hz', 4, y - 3); });
+    const b = await new Promise(r => cv.toBlob(r, 'image/jpeg', .9)); await fetch('/__save?path=' + encodeURIComponent('out/shots/spectro.jpg'), { method: 'POST', body: b });
+    await log('SPECTRO DONE');
+  } catch (e) { await log('SPECTRO ERR ' + e); }
+})();
+</script></body>

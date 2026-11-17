@@ -1,0 +1,52 @@
+<!doctype html><meta charset="utf-8">
+<style>
+  @font-face { font-family: "Opus Serif"; src: url("../fonts/NotoSerifSC-VF.ttf") format("truetype"); font-weight: 200 900; }
+</style>
+<body style="background:#111"><script>
+// 视频封面：用成片里的真实 4K 画面 + 标题文字，输出到 封面/ 文件夹
+(async () => {
+  const log = m => fetch('/__log?m=' + encodeURIComponent(m));
+  try {
+    const load = src => new Promise((r, j) => { const i = new Image(); i.onload = () => r(i); i.onerror = j; i.src = src; });
+    const A = await load('../out/shots/cover-src-25.3.jpg'), B = await load('../out/shots/cover-src-147.5.jpg');
+    for (const f of ['900 100px "Opus Serif"', '600 100px "Opus Serif"', '300 40px "Segoe UI Variable Display"']) { try { await document.fonts.load(f, '凌晨三点模型列表OPUS'); } catch (e) { } }
+    const SERIF = '"Opus Serif", serif';
+    const save = async (cv, name) => { const b = await new Promise(r => cv.toBlob(r, 'image/jpeg', .93)); await fetch('/__save?path=' + encodeURIComponent('封面/' + name), { method: 'POST', body: b }); };
+    const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+    // 带柔和阴影的标题
+    const title = (x, lines, cx, y0, size, lh, align = 'left') => {
+      x.save(); x.textAlign = align; x.textBaseline = 'alphabetic'; x.font = `900 ${size}px ${SERIF}`;
+      lines.forEach((l, i) => { const y = y0 + i * lh; x.shadowColor = 'rgba(0,0,0,.85)'; x.shadowBlur = size * .45; x.fillStyle = 'rgba(0,0,0,.35)'; x.fillText(l, cx, y); x.shadowBlur = size * .12; x.shadowColor = 'rgba(160,190,255,.25)'; x.fillStyle = '#f4f2ec'; x.fillText(l, cx, y); });
+      x.restore();
+    };
+    const tag = (x, s, cx, y, size, align = 'left') => { x.save(); x.textAlign = align; x.font = `300 ${size}px "Segoe UI Variable Display", "Segoe UI"`; if ('letterSpacing' in x) x.letterSpacing = `${Math.round(size * .55)}px`; x.fillStyle = 'rgba(220,220,220,.72)'; x.shadowColor = 'rgba(0,0,0,.9)'; x.shadowBlur = 12; x.fillText(s, cx, y); x.restore(); };
+    const grad = (x, w, h, y0, y1, a0, a1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, `rgba(0,0,0,${a0})`); g.addColorStop(1, `rgba(0,0,0,${a1})`); x.fillStyle = g; x.fillRect(0, Math.min(y0, y1), w, Math.abs(y1 - y0)); };
+    const vig = (x, w, h, k) => { const g = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .35, w / 2, h / 2, Math.max(w, h) * .75); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${k})`); x.fillStyle = g; x.fillRect(0, 0, w, h); };
+
+    // ---------- 封面 A：模型列表 ----------
+    { const [c, x] = mk(1920, 1080); x.filter = 'brightness(1.02) contrast(1.1) saturate(.9)'; x.drawImage(A, 0, 0, 1920, 1080); x.filter = 'none';
+      grad(x, 1920, 1080, 0, 560, .94, 0); vig(x, 1920, 1080, .55);
+      title(x, ['凌晨三点，', '模型列表里多了一个它'], 110, 175, 112, 150); tag(x, 'OPUS 50', 1810, 1030, 34, 'right');
+      await save(c, '封面A_模型列表_16x9.jpg'); }
+    { const [c, x] = mk(1440, 1080); x.filter = 'brightness(1.02) contrast(1.1) saturate(.9)'; x.drawImage(A, 300, 0, 2880, 2160, 0, 0, 1440, 1080); x.filter = 'none';
+      grad(x, 1440, 1080, 0, 520, .94, 0); vig(x, 1440, 1080, .55);
+      title(x, ['凌晨三点，', '模型列表里多了一个它'], 80, 160, 100, 134); tag(x, 'OPUS 50', 1360, 1030, 30, 'right');
+      await save(c, '封面A_模型列表_1440x1080.jpg'); }
+    { const [c, x] = mk(1080, 1440); x.filter = 'brightness(1.02) contrast(1.1) saturate(.9)'; x.drawImage(A, 560, 0, 1620, 2160, 0, 0, 1080, 1440); x.filter = 'none';
+      grad(x, 1080, 1440, 0, 640, .94, 0); vig(x, 1080, 1440, .5);
+      title(x, ['凌晨三点，', '模型列表里', '多了一个它'], 80, 170, 104, 138); tag(x, 'OPUS 50', 540, 1390, 30, 'center');
+      await save(c, '封面A_模型列表_3x4.jpg'); }
+
+    // ---------- 封面 B：黑屏倒影 ----------
+    { const [c, x] = mk(1920, 1080); x.filter = 'brightness(1.75) contrast(1.15)'; x.drawImage(B, 0, 0, 1920, 1080); x.filter = 'none';
+      grad(x, 1920, 1080, 640, 1080, 0, .78); vig(x, 1920, 1080, .5);
+      title(x, ['我只是开个玩笑，', '问它怎么逆转熵增。'], 960, 830, 92, 124, 'center'); tag(x, 'OPUS 50', 960, 1040, 30, 'center');
+      await save(c, '封面B_倒影_16x9.jpg'); }
+    { const [c, x] = mk(1080, 1440); x.filter = 'brightness(1.75) contrast(1.15)'; x.drawImage(B, 1110, 0, 1620, 2160, 0, 0, 1080, 1440); x.filter = 'none';
+      grad(x, 1080, 1440, 850, 1440, 0, .82); vig(x, 1080, 1440, .5);
+      title(x, ['我只是开个玩笑，', '问它怎么逆转熵增。'], 540, 1170, 82, 112, 'center'); tag(x, 'OPUS 50', 540, 1390, 28, 'center');
+      await save(c, '封面B_倒影_3x4.jpg'); }
+    await log('COVER DONE');
+  } catch (e) { await log('COVER ERR ' + e); }
+})();
+</script></body>

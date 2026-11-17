@@ -1,0 +1,11 @@
+# 渲染产物与中间文件（都可以重新生成）
+out/
+*.mp4
+tools/render.log
+
+# 没有用到的素材
+assets/4K*
+
+# 系统文件
+Thumbs.db
+desktop.ini

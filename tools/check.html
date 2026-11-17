@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><body><script>
+// 检查成片：能否解码、时长、分辨率、音轨；抽几帧存成 out/shots/check-<t>.jpg
+(async () => {
+  const q = new URLSearchParams(location.search), log = m => fetch('/__log?m=' + encodeURIComponent(m));
+  try {
+    const v = document.createElement('video'); v.muted = true; v.src = '../' + q.get('f'); v.preload = 'auto';
+    await new Promise((r, j) => { v.onloadeddata = r; v.onerror = () => j(new Error('video error ' + (v.error && v.error.code))); });
+    const hasAudio = v.mozHasAudio || (v.audioTracks && v.audioTracks.length) || v.webkitAudioDecodedByteCount > 0;
+    await log(`CHECK dur=${v.duration.toFixed(2)} ${v.videoWidth}x${v.videoHeight}`);
+    const c = document.createElement('canvas'); c.width = 960; c.height = 540; const x = c.getContext('2d');
+    for (const t of (q.get('t') || '1,5').split(',').map(Number)) {
+      const shown = new Promise(r => { if (v.requestVideoFrameCallback) v.requestVideoFrameCallback((now, md) => r(md.mediaTime)); else setTimeout(() => r(-1), 800); });
+      v.currentTime = t; await new Promise(r => v.onseeked = r);
+      const mt = await Promise.race([shown, new Promise(r => setTimeout(() => r(-2), 3000))]);
+      await new Promise(r => setTimeout(r, 150)); x.drawImage(v, 0, 0, 960, 540);
+      await log(`FRAME want=${t} got=${typeof mt === 'number' ? mt.toFixed(3) : mt}`);
+      const b = await new Promise(r => c.toBlob(r, 'image/jpeg', .85)); await fetch('/__save?path=' + encodeURIComponent(`out/shots/check-${t}.jpg`), { method: 'POST', body: b });
+    }
+    // 音频：用 WebAudio 解码整段，报告时长与峰值
+    const ab = await (await fetch('../' + q.get('f'))).arrayBuffer(); const ac = new OfflineAudioContext(2, 48000, 48000);
+    try { const buf = await ac.decodeAudioData(ab); let pk = 0; const d = buf.getChannelData(0); for (let i = 0; i < d.length; i += 3) pk = Math.max(pk, Math.abs(d[i])); await log(`AUDIO dur=${buf.duration.toFixed(2)} ch=${buf.numberOfChannels} sr=${buf.sampleRate} peak=${pk.toFixed(3)}`); }
+    catch (e) { await log('AUDIO decode failed ' + e); }
+    await log('CHECK DONE');
+  } catch (e) { await log('CHECK ERR ' + e); }
+})();
+</script></body>
